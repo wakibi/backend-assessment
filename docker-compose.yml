@@ -8,7 +8,7 @@ services:
       POSTGRES_PASSWORD: assessment
       POSTGRES_DB: events_db
     ports:
-      - "5433:5432"
+      - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -20,12 +20,34 @@ services:
   redis:
     image: redis:7-alpine
     ports:
-      - "6380:6379"
+      - "6379:6379"
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
       timeout: 5s
       retries: 5
+
+  backend:
+    restart: always
+    ports:
+      - "8000:8000"
+    networks:
+      - default
+    depends_on:
+      postgres:
+        condition: service_healthy
+        restart: true
+      redis:
+        condition: service_healthy
+    env_file:
+      - .env
+    volumes:
+      - ./app:/code/app
+      - ./alembic:/code/alembic
+      - ./tests:/code/tests
+    build:
+      context: .
+      dockerfile: Dockerfile
 
 volumes:
   postgres_data:
