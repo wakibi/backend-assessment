@@ -138,7 +138,7 @@ async def test_sync_endpoint(override_db, override_redis, monkeypatch):
         r = await client.post(f"{settings.API_V1_STR}/events/sync", json=payload)
         assert r.status_code == 200
         data = r.json()
-        assert data["status"] == "success"
+        assert data["status"] == "completed"
         assert data["events_created"] == 1
 
 

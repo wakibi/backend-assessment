@@ -30,7 +30,7 @@ async def test_sync_creates_and_skips(db_session, monkeypatch):
 
     # first sync should create one event
     result = await EventService.sync_events_for_symbols(db_session, ["TEST"], force=False)
-    assert result.status == "success"
+    assert result.status == "completed"
     assert result.events_created == 1
     assert result.events_updated == 0
     assert result.symbols_synced == ["TEST"]

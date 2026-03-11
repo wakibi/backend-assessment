@@ -154,7 +154,7 @@ class EventService:
         )
         # cache for next time
         # ensure datetimes are serialized (created_at) by falling back to str
-        redis_client.set(key, json.dumps(event.dict(), default=str))
+        redis_client.set(key, json.dumps(event.model_dump(), default=str))
         return event, False
         
     @staticmethod
@@ -223,17 +223,13 @@ class EventService:
         symbols: List[str],
         force: bool = False
     ) -> EventSyncPublic:
-        """
-        - force: false skips symbols synced in the last hour
-        - force: true always fetches fresh
-        """
         # _partition_symbols is async
         to_sync, skipped = await EventService._partition_symbols(session, symbols, force)
         now = datetime.now(timezone.utc)  # still needed later for timestamps
         
         if not to_sync:
             return EventSyncPublic(
-                status="success",
+                status="completed",
                 symbols_synced=[],
                 symbols_skipped=skipped,
                 events_created=0,
@@ -352,13 +348,13 @@ class EventService:
                 created_at=now
             )
             # serialize datetimes when caching
-            redis_client.set(f"event:{db_id}", json.dumps(event_public.dict(), default=str))
+            redis_client.set(f"event:{db_id}", json.dumps(event_public.model_dump(), default=str))
 
         # update updated_at for synced symbols
         for symbol in to_sync:
             await EventService._mark_symbol_updated(session, symbol, now)
         return EventSyncPublic(
-            status="success",
+            status="completed",
             symbols_synced=to_sync,
             symbols_skipped=skipped,
             events_created=events_created,
