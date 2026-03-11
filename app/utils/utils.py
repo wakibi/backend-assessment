@@ -4,17 +4,23 @@ from functools import reduce
 from redis.client import Redis
 from redis.exceptions import ConnectionError
 from sqlalchemy import Engine
-from sqlmodel import Session, select
+from sqlalchemy.ext.asyncio import AsyncSession, AsyncEngine
+from sqlmodel import select
 
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-def check_db_status(db_engine: Engine) -> dict[str, str]:
+async def check_db_status(db_engine: AsyncEngine) -> dict[str, str]:
+    """Asynchronously verify the database connection is healthy.
+
+    The function opens an ``AsyncSession`` against the provided engine and
+    executes a minimal ``SELECT 1``.  It returns ``{'status': 'ok'}`` on
+    success, otherwise ``{'status': 'error'}`` and logs the exception.
+    """
     try:
-        with Session(db_engine) as session:
-            # Try to create session to check if DB is awake
-            session.exec(select(1))
+        async with AsyncSession(db_engine) as session:
+            await session.execute(select(1))
             return {'status': 'ok'}
     except Exception as e:
         logger.error(e)

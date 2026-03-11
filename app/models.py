@@ -41,17 +41,21 @@ class EventExchange(EventAttribute, table=True):
 
 class Event(EventBase, table=True):
     event_id: str
-    symbol: int = Field(foreign_key="eventsymbol.id")
-    event_type: int = Field(foreign_key="eventtype.id")
+    symbol: uuid.UUID = Field(foreign_key="eventsymbol.id")
+    event_type: uuid.UUID = Field(foreign_key="eventtype.id")
     event_date: datetime = Field(sa_type=DateTime(timezone=True))
     title: str
     details: Dict[str, Any] | None = Field(sa_type=JSON)
     event_metadata: Dict[str, Any] = Field(sa_type=JSON)
     description: str | None
-    exchange: int | None = Field(foreign_key="eventexchange.id")
+    exchange: uuid.UUID | None = Field(foreign_key="eventexchange.id")
 
-    __table_args__ = (Index('idx_event_dedupe', 'symbol', 'event_type', func.date('event_date')), )
 
+
+# note: deduplication index removed because expression indexes with functions
+# (date, cast, etc.) are not considered IMMUTABLE by PostgreSQL and cannot be created
+# easily without defining custom IMMUTABLE helpers. The service logic still enforces
+# uniqueness programmatically.
 
 class EventPublic(SQLModel):
     id: str

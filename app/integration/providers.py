@@ -52,8 +52,22 @@ class ProviderB(Provider):
         self.client = provider_b.ProviderB(api_key=api_key)
 
     async def fetch_events(self, symbols: list[str], days_ahead: int = 30) -> list[dict[str, Any]]:
-        events = await self.client.fetch_events(symbols=symbols, days_ahead=days_ahead)
-        return [self.adapter(event) for event in events]
+        """Collect events from the underlying client, handling both flat lists
+        and the paginated dict format used by provider_b"""
+        collected: list[dict[str, Any]] = []
+        cursor = None
+        while True:
+            resp = await self.client.fetch_events(symbols=symbols, days_ahead=days_ahead, cursor=cursor)
+            if isinstance(resp, dict):
+                collected.extend(resp.get("events", []))
+                pag = resp.get("pagination", {})
+                if not pag.get("has_next"):
+                    break
+                cursor = pag.get("next_cursor")
+            else:
+                collected.extend(resp)
+                break
+        return [self.adapter(event) for event in collected]
 
     async def get_event(self, event_id: str) -> dict[str, Any] | None:
         event = await self.client.get_event(event_id=event_id)
@@ -61,8 +75,12 @@ class ProviderB(Provider):
 
     def adapter(self, event: dict) -> dict:
         provider_dict = {key: get_nested_dict_value(event, value.split(".")) for key, value in PROVIDER_B_MAPPINGS.items()}
-        event_details_key = str(provider_dict.get("event_type")).split("_")[-1].lower() + "_data"
-        provider_dict["details"] = event.get(event_details_key)
+        # determine details key based on the first segment of the event_type
+        et = provider_dict.get("event_type", "")
+        base = et.split("_")[0] if isinstance(et, str) else ""
+        details_key = f"{base}_data"
+        # nested under event
+        provider_dict["details"] = get_nested_dict_value(event, ["event", details_key]) or {}
         return provider_dict
 
 

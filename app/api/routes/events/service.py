@@ -6,10 +6,9 @@ from fastapi import HTTPException
 from sqlmodel import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models import Event, EventSyncPublic, EventsPublic, EventPublic, EventSymbol, EventType, EventExchange, RedisDBHealthPublic
+from app.models import Event, EventSyncPublic, EventsPublic, EventPublic, EventSymbol, EventType, EventExchange
 from app.integration.providers import ProviderA, ProviderB
-from app.utils.utils import check_db_status, check_redis_status
-from app.settings.db import engine, redis_client
+from app.settings.db import redis_client
 import json
 
 T = TypeVar("T")  # generic type for _get_or_create
@@ -83,12 +82,13 @@ class EventService:
 
         events: list[EventPublic] = []
         for row in rows:
+            # ``row`` may be a plain tuple or a ``Row`` object (which behaves like
+            # a tuple but doesn't subclass it).  Normalize by indexing.
             if isinstance(row, tuple):
                 event_obj, symbol_name, type_name = row
             else:
-                event_obj = row
-                symbol_name = ""
-                type_name = ""
+                # Row supports positional access too
+                event_obj, symbol_name, type_name = row[0], row[1], row[2]
 
             events.append(
                 EventPublic(
@@ -153,7 +153,8 @@ class EventService:
             created_at=event_obj.created_at,
         )
         # cache for next time
-        redis_client.set(key, json.dumps(event.dict()))
+        # ensure datetimes are serialized (created_at) by falling back to str
+        redis_client.set(key, json.dumps(event.dict(), default=str))
         return event, False
         
     @staticmethod
@@ -226,7 +227,8 @@ class EventService:
         - force: false skips symbols synced in the last hour
         - force: true always fetches fresh
         """
-        to_sync, skipped = EventService._partition_symbols(session, symbols, force)
+        # _partition_symbols is async
+        to_sync, skipped = await EventService._partition_symbols(session, symbols, force)
         now = datetime.now(timezone.utc)  # still needed later for timestamps
         
         if not to_sync:
@@ -258,9 +260,24 @@ class EventService:
                 errors=[str(e)]
             )
         
+        # deduplicate events from providers by symbol/type/date to avoid double-counting
+        seen_keys: set[tuple[str, str, datetime.date]] = set()
         events_created = 0
         events_updated = 0
         for event in events:
+            key = (
+                event.get("symbol"),
+                event.get("event_type"),
+                # event_date may still be str at this point; parse to date if needed
+                (
+                    datetime.fromisoformat(event["event_date"].replace("Z", "+00:00")).date()
+                    if isinstance(event.get("event_date"), str)
+                    else event.get("event_date").date()
+                )
+            )
+            if key in seen_keys:
+                continue
+            seen_keys.add(key)
             if event['symbol'] not in to_sync:
                 continue
             
@@ -297,7 +314,7 @@ class EventService:
                 existing.event_date = event_date
                 existing.title = event['title']
                 existing.details = event.get('details', {})
-                existing.metadata = event.get('metadata', {})
+                existing.event_metadata = event.get('event_metadata', event.get('metadata', {}))
                 existing.description = event.get('description')
                 existing.exchange = exch.id if exch else None
                 existing.updated_at = now
@@ -313,7 +330,7 @@ class EventService:
                     event_date=event_date,
                     title=event['title'],
                     details=event.get('details', {}),
-                    metadata=event.get('metadata', {}),
+                    event_metadata=event.get('event_metadata', event.get('metadata', {})),
                     description=event.get('description'),
                     exchange=exch.id if exch else None
                 )
@@ -334,7 +351,8 @@ class EventService:
                 details=event.get('details', {}),
                 created_at=now
             )
-            redis_client.set(f"event:{db_id}", json.dumps(event_public.dict()))
+            # serialize datetimes when caching
+            redis_client.set(f"event:{db_id}", json.dumps(event_public.dict(), default=str))
 
         # update updated_at for synced symbols
         for symbol in to_sync:
@@ -347,9 +365,3 @@ class EventService:
             events_updated=events_updated,
             errors=[]
         )
-
-    @staticmethod
-    def check_services_health() -> RedisDBHealthPublic:
-        db_status = check_db_status(engine)
-        redis_status = check_redis_status(redis_client)
-        return RedisDBHealthPublic(redis=redis_status, db=db_status)

@@ -3,7 +3,7 @@ from datetime import datetime
 
 from fastapi import APIRouter, Response
 
-from app.models import EventSyncPublic, EventSyncStart, EventsPublic, EventPublic, RedisDBHealthPublic
+from app.models import EventSyncPublic, EventSyncStart, EventsPublic, EventPublic
 from app.api.deps import SessionDep
 from app.api.routes.events.service import EventService
 
@@ -30,6 +30,10 @@ async def get_events(
         symbols=symbols
     )
 
+@router.post("/sync", response_model=EventSyncPublic)
+async def sync_events(session: SessionDep, request: EventSyncStart) -> EventSyncPublic:
+    return await EventService.sync_events_for_symbols(session=session, symbols=request.symbols, force=request.force)
+
 @router.get("/{event_id}", response_model=EventPublic)
 async def get_event(session: SessionDep, event_id: uuid.UUID, response: Response) -> EventPublic:
     event, hit = await EventService.get_event(
@@ -38,11 +42,3 @@ async def get_event(session: SessionDep, event_id: uuid.UUID, response: Response
     )
     response.headers["X-Cache"] = "HIT" if hit else "MISS"
     return event
-
-@router.get("/health", response_model=RedisDBHealthPublic)
-def check_services_health() -> RedisDBHealthPublic:
-    return EventService.check_services_health()
-
-@router.post("/sync", response_model=EventSyncPublic)
-async def sync_events(session: SessionDep, request: EventSyncStart) -> EventSyncPublic:
-    return await EventService.sync_events_for_symbols(session=session, symbols=request.symbols, force=request.force)

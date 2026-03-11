@@ -9,15 +9,6 @@ from app.models import Event, EventSymbol, EventType
 from app.api.routes.events.service import EventService
 
 
-@pytest.fixture(name="in_memory_session")
-async def in_memory_session_fixture():
-    engine = create_async_engine("sqlite+aiosqlite:///:memory:")
-    async with engine.begin() as conn:
-        await conn.run_sync(SQLModel.metadata.create_all)
-    AsyncSessionLocal = sessionmaker(bind=engine, class_=AsyncSession, expire_on_commit=False)
-    async with AsyncSessionLocal() as session:
-        yield session
-
 
 async def seed_data(session: AsyncSession):
     """Insert a symbol, a type, and a couple of events."""
@@ -36,9 +27,9 @@ async def seed_data(session: AsyncSession):
         event_date=base_date,
         title="First",
         details={},
-        metadata={},
+        event_metadata={},
         description=None,
-        exchange=1,
+        exchange=None,
     )
     e2 = Event(
         event_id="e2",
@@ -47,17 +38,17 @@ async def seed_data(session: AsyncSession):
         event_date=base_date + timedelta(days=1),
         title="Second",
         details={"foo": "bar"},
-        metadata={},
+        event_metadata={},
         description=None,
-        exchange=1,
+        exchange=None,
     )
     session.add_all([e1, e2])
     await session.commit()
 
 
 @pytest.mark.asyncio
-async def test_get_events_basic(in_memory_session):
-    session = in_memory_session
+async def test_get_events_basic(db_session):
+    session = db_session
     await seed_data(session)
     result = await EventService.get_events(session)
     assert result.total == 2
@@ -68,8 +59,8 @@ async def test_get_events_basic(in_memory_session):
 
 
 @pytest.mark.asyncio
-async def test_get_events_pagination(in_memory_session):
-    session = in_memory_session
+async def test_get_events_pagination(db_session):
+    session = db_session
     await seed_data(session)
     res1 = await EventService.get_events(session, limit=1, offset=0)
     assert res1.total == 2
@@ -81,8 +72,8 @@ async def test_get_events_pagination(in_memory_session):
 
 
 @pytest.mark.asyncio
-async def test_get_events_filters(in_memory_session):
-    session = in_memory_session
+async def test_get_events_filters(db_session):
+    session = db_session
     await seed_data(session)
     # by symbol
     r = await EventService.get_events(session, symbols="AAPL")
@@ -100,8 +91,8 @@ async def test_get_events_filters(in_memory_session):
 
 
 @pytest.mark.asyncio
-async def test_invalid_params(in_memory_session):
-    session = in_memory_session
+async def test_invalid_params(db_session):
+    session = db_session
     await seed_data(session)
     with pytest.raises(Exception):
         await EventService.get_events(session, limit=0)
@@ -114,15 +105,15 @@ async def test_invalid_params(in_memory_session):
 
 
 @pytest.mark.asyncio
-async def test_get_event_caching(in_memory_session):
+async def test_get_event_caching(db_session):
     # ensure redis is cleared or skip if unavailable
+    session = db_session
     from app.settings.db import redis_client
     try:
         redis_client.flushdb()
     except Exception:
         pytest.skip("redis not available")
 
-    session = in_memory_session
     await seed_data(session)
     # grab an event id
     result = await session.execute(select(Event).limit(1))
