@@ -115,13 +115,13 @@ Now you can access the application at [localhost](http://127.0.0.1:8000/docs). M
 
 
 ## Architecture notes
-I have kept the project asynchronous especially for database calls and external API calls.
-For the providers, I decided to use a combination of adapter and abstraction patterns to enable our code to be extendable in case new providers are added.
-The data caching has also been kept and works fine - complete with the header for `MISS` or `HIT`.
-I have split the file structure into obvious folders and locations so that you can easily understand what logic was implemented in which sub-folder. For example integrations to third parties should all be located under the integrations folder, the APIs are all implemented under the API sub-folder, settings to make sure any settings are taken care of under that folder.
-The logic to filter out and map the different providers makes use of mappings which should also be easily changed in just one location should the upstream providers change the mapping of the returned data (JSON/dict).
-I have also gone ahead and opted for alembic to manage migrations and make sure they are automatically taken care of.
-I modified the bootstrapping of the application so that it's easier to start / install and also it's dependency on external / host systems is minimized. With this, it should pretty much run on any host.
+- I have kept the project asynchronous especially for database calls and external API calls.
+- For the providers, I decided to use a combination of adapter and abstraction patterns to enable our code to be extendable in case new providers are added.
+- The data caching has also been kept and works fine - complete with the header for `MISS` or `HIT`.
+- I have split the file structure into obvious folders and locations so that you can easily understand what logic was implemented in which sub-folder. For example integrations to third parties should all be located under the integrations folder, the APIs are all implemented under the API sub-folder, settings to make sure any settings are taken care of under that folder.
+- The logic to filter out and map the different providers makes use of mappings which should also be easily changed in just one location should the upstream providers change the mapping of the returned data (JSON/dict).
+- I have also gone ahead and opted for alembic to manage migrations and make sure they are automatically taken care of.
+- I modified the bootstrapping of the application so that it's easier to start / install and also it's dependency on external / host systems is minimized. With this, it should pretty much run on any host.
 
 ## Questions?
 
