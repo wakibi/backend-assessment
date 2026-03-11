@@ -1,11 +1,12 @@
 from fastapi import FastAPI
 
+from app.api.main import api_router
+from app.settings import settings
+
 app = FastAPI(
     title="Market Events Service",
     version="0.1.0",
 )
 
 
-@app.get("/api/v1/health")
-async def health():
-    return {"status": "ok"}
+app.include_router(api_router, prefix=settings.API_V1_STR)

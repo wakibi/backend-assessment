@@ -114,4 +114,10 @@ poetry run uvicorn app.main:app --reload --port 8000
 
 ## Questions?
 
-If something's unclear, document your assumptions and move on.
+If something's unclear, document your assumptions and move on. 
+
+
+## Assumptions
+- uuid is a UUID not event_id as returned by external APIs
+- date as returned in provider_a is the event_date in our API, ticker -> symbol. Created at in the API is the timestamp the data was actually imported from the providers.
+- Provider A date is in UTC
