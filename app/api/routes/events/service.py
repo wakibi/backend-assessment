@@ -15,7 +15,6 @@ import json
 T = TypeVar("T")  # generic type for _get_or_create
 
 
-
 class EventService:
     @staticmethod
     async def get_events(

@@ -10,7 +10,7 @@ from app.api.routes.events.service import EventService
 
 router = APIRouter(prefix="/events", tags=["events"])
 
-@router.get("/events", response_model=EventsPublic)
+@router.get("/", response_model=EventsPublic)
 async def get_events(
     session: SessionDep,
     limit: int = 100,
@@ -30,7 +30,7 @@ async def get_events(
         symbols=symbols
     )
 
-@router.get("/events/{event_id}", response_model=EventPublic)
+@router.get("/{event_id}", response_model=EventPublic)
 async def get_event(session: SessionDep, event_id: uuid.UUID, response: Response) -> EventPublic:
     event, hit = await EventService.get_event(
         session=session,
@@ -43,6 +43,6 @@ async def get_event(session: SessionDep, event_id: uuid.UUID, response: Response
 def check_services_health() -> RedisDBHealthPublic:
     return EventService.check_services_health()
 
-@router.post("/events/sync", response_model=EventSyncPublic)
+@router.post("/sync", response_model=EventSyncPublic)
 async def sync_events(session: SessionDep, request: EventSyncStart) -> EventSyncPublic:
     return await EventService.sync_events_for_symbols(session=session, symbols=request.symbols, force=request.force)
